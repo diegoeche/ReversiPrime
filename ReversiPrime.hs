@@ -3,9 +3,9 @@
 import qualified Data.Map as M
 -- import qualified Data.Set as S
 import Control.Monad.State
-import Control.Arrow (first,(&&&), (***))
+import Control.Arrow ((&&&), (***), second)
 import Data.Data
-import Data.Generics.PlateData
+import Data.Generics.PlateData (universe)
 import Data.List
 import Data.Maybe
 import Data.Typeable
@@ -88,13 +88,11 @@ play p (Reversi b cp) = Reversi newBoard (nextPlayer cp)
  --                     -- (minProj fst, minProj snd)
  --                     minProj f = minimum $ map f (M.keys b)
 
-
-    -- nub $ map sort $ 
-    --     do
-    --       game <- games
-    --       rot <- rots
-    --       return $ map (rot<*>) game
-
+ -- nub $ map sort $ 
+ --     do
+ --       game <- games
+ --       rot <- rots
+ --       return $ map (rot<*>) game
     
 moves :: Reversi -> [Reversi]
 moves g@(Reversi b _) =  map (flip play g) moves
@@ -125,13 +123,12 @@ getIO = lift
 static :: Reversi -> Int
 static (Reversi b cp) = length $ filter (cp==) (M.elems b)
 
-maximize :: (Ord a) => Tree a -> a
-maximize (Node n []) = n
-maximize (Node n cs) = maximum (map minimize cs)
-minimize :: (Ord a) => Tree a -> a
-minimize (Node n []) = n
-minimize (Node n cs) = minimum (map maximize cs)
-
+-- maximize :: (Ord a) => Tree a -> a
+-- maximize (Node n []) = n
+-- maximize (Node n cs) = maximum (map minimize cs)
+-- minimize :: (Ord a) => Tree a -> a
+-- minimize (Node n []) = n
+-- minimize (Node n cs) = minimum (map maximize cs)
 
 -- wfp matters version:
 minLeq :: (Ord t) => [t] -> t -> Bool
@@ -180,8 +177,7 @@ minimize' (Node n cs) = mapMax (map maximize' cs)
 -- highFirst (Node n cs) = Node n (sortBy compareTree (map lowFirst cs))
 -- lowFirst (Node n cs) = Node n (sortBy (flip compareTree) (map highFirst cs))
 
--- evaluateN n = maximize . fmap static . prun n . gameTree
-gameSize = 12
+gameSize = 13
 
 evaluateN :: (Integral t) => t -> Reversi -> Int
 evaluateN n = maximum . maximize' . fmap static . prun n . gameTree' gameSize
@@ -189,8 +185,9 @@ evaluate = evaluateN 2
 
 -- Where n is the n-levels to explore.
 
-minMaxPlayer n | even n  = strategy minimumBy
-               | otherwise = strategy maximumBy
+-- minMaxPlayer n | even n  = strategy minimumBy
+--                | otherwise = strategy maximumBy
+minMaxPlayer n  = strategy minimumBy
     where strategy f = snd . f (comparing fst) . map (evaluateN n &&& id) . moves 
 
 
@@ -214,22 +211,17 @@ alwaysLastMove = head . reverse . moves
 createGame :: Int -> (b -> b) -> (b -> b) -> [b -> b]
 createGame n playerBlack playerWhite =  take n $ cycle [playerBlack, playerWhite]
 
-game1 =  createGame gameSize alwaysLastMove   (minMaxPlayer 2 )
-game2 =  createGame gameSize (minMaxPlayer 2) alwaysLastMove
-game3 =  createGame gameSize alwaysFirstMove  (minMaxPlayer 2 )
-game4 =  createGame gameSize (minMaxPlayer 2 ) alwaysFirstMove
-game5 =  createGame gameSize (minMaxPlayer 2 ) (minMaxPlayer 2 )
-game6 =  createGame gameSize (minMaxPlayer 2 ) (minMaxPlayer 0 )
-
 showNumTokens color = map (length . filter (==color) . M.elems . board . ($initialGame)) . scanl1 (.)
-showLastPosition = board . ($initialGame) . foldl1 (.) 
+
+showLastPosition :: [Reversi -> Reversi] -> Int
+showLastPosition = length . filter (==Black) . M.elems . board . ($initialGame) . foldl1 (.) 
+
 main =
     do
-      let game = createGame (gameSize - 4) (minMaxPlayer 0) (minMaxPlayer 2)
-      print $ showNumTokens Black $ game
-      print $ showLastPosition game
-
-      -- print $ showNumTokens Black game5
+      let game i j = createGame (gameSize - 4) (minMaxPlayer i) (minMaxPlayer j)
+          l = [0..3]
+          games = [((i,j),game i j) | i <- l, j <- l]
+      mapM (print . second showLastPosition) games
 
 --           -- length nodes
 --           --     where nodes = [() | Node _ _ <- universe $ prun 6 $ gameTree newGame]  
@@ -243,24 +235,5 @@ main =
 
   sort $ lastLevel 0 $ (static `fmap` (gameTree g1))
   evaluateN 2 (g1)
-
-
-map (length . (filter (==Black)) . M.elems . board . ($newGame)) $ game'
-
-x0
-0x
-
-xxx
-0x
-
-x0
-0x
-  x
-
-  x
-x0
-0x
-  
-
 
 -}
