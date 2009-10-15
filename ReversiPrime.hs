@@ -1,4 +1,4 @@
-{-# LANGUAGE ViewPatterns, ScopedTypeVariables, DeriveDataTypeable, NoMonomorphismRestriction #-}
+{-# LANGUAGE ScopedTypeVariables, DeriveDataTypeable, NoMonomorphismRestriction #-}
 
 import qualified Data.Map as M
 -- import qualified Data.Set as S
@@ -44,7 +44,7 @@ emptyGame :: Reversi
 emptyGame = Reversi { board = M.empty, currentPlayer = Black }
 
 initialGame = emptyGame {board = b}
-    where b = M.fromList [((i,j), if (odd $ i + j) then Black else White) | i <- [0,1], j <- [0,1]]
+    where b = M.fromList [((i,j), if odd $ i + j then Black else White) | i <- [0,1], j <- [0,1]]
 
 liftBin :: (a -> b -> c) -> (a,a) -> (b,b) -> (c,c)
 liftBin f (x1,y1) (x2,y2) = (x1 `f` x2, y1 `f` y2)
@@ -64,9 +64,10 @@ nexts = [(i,j) | i <- l, j <- l, (i,j) /= (0,0)]
 
 rots = [(i,j) | i <- l, j <- l]
     where l = [-1,1]
+
 play :: Position -> Reversi -> Reversi
 play p (Reversi b cp) = Reversi newBoard (nextPlayer cp)
-    where newBoard = foldr (\k b -> M.insert k cp b) b (p:getPositions)
+    where newBoard = foldr (\k -> M.insert k cp) b (p:getPositions)
           getPositions = do
             move <- nexts
             takePositons [] $ iterate (move <+>) (move <+> p)
@@ -132,16 +133,10 @@ static (Reversi b cp) = length $ filter (cp==) (M.elems b)
 
 -- wfp matters version:
 minLeq :: (Ord t) => [t] -> t -> Bool
-minLeq [] pot = False 
-minLeq (num: rest) pot = 
-    if  num <= pot then True
-    else minLeq rest pot
+minLeq rest pot = foldr ((||) . (<= pot)) False rest 
 
 maxLeq :: (Ord t) => [t] -> t -> Bool
-maxLeq [] pot = False 
-maxLeq (num: rest) pot = 
-    if  num >= pot then True
-    else maxLeq rest pot
+maxLeq rest pot = foldr ((||) . (>= pot)) False rest
 
 omitMin :: (Ord a) => a -> [[a]] -> [a]
 omitMin pot [] = []
@@ -149,35 +144,35 @@ omitMin pot (nums:rest) =
     if minLeq nums pot then omitMin pot rest
     else 
         let min = minimum nums
-        in min : (omitMin min rest)
+        in min: omitMin min rest
 
 omitMax pot [] = []
 omitMax pot (nums:rest) = 
     if maxLeq nums pot then omitMax pot rest
     else 
         let max = maximum nums
-        in max : (omitMax max rest)
+        in max: omitMax max rest
 
 mapMin [] = []
 mapMin (nums:rest) = 
     let min = minimum nums
-    in min : (omitMin min rest)
+    in min: omitMin min rest
 
 mapMax [] = []
 mapMax (nums:rest) = 
     let max = maximum nums
-    in max : (omitMax max rest)
+    in max: omitMax max rest
 
-maximize' (Node n []) = n:[]
+maximize' (Node n []) = [n]
 maximize' (Node n cs) = mapMin (map minimize' cs)
-minimize' (Node n []) = n:[]
+minimize' (Node n []) = [n]
 minimize' (Node n cs) = mapMax (map maximize' cs)
 
 -- compareTree (Node n1 _) (Node n2 _)  = compare n1 n2
 -- highFirst (Node n cs) = Node n (sortBy compareTree (map lowFirst cs))
 -- lowFirst (Node n cs) = Node n (sortBy (flip compareTree) (map highFirst cs))
 
-gameSize = 13
+gameSize = 1
 
 evaluateN :: (Integral t) => t -> Reversi -> Int
 evaluateN n = maximum . maximize' . fmap static . prun n . gameTree' gameSize
@@ -194,7 +189,7 @@ minMaxPlayer n  = strategy minimumBy
 alwaysFirstMove :: Reversi -> Reversi
 alwaysFirstMove = head  . moves
 
-alwaysLastMove = head . reverse . moves
+alwaysLastMove = last . moves
 
 -- main :: IO ()
 -- main = liftM fst $ runStateT loop newGame
